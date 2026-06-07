@@ -11,17 +11,36 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   try {
-    const creator = db.prepare("SELECT * FROM creators WHERE id = ?").get(id);
+    const { data: creator, error: creatorError } = await db
+      .from("creators")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (creatorError) throw creatorError;
     if (!creator) {
       return NextResponse.json({ error: "Creator not found" }, { status: 404 });
     }
 
-    const comics = db.prepare(`
-      SELECT c.id, c.title, c.cover_image, c.genre
-      FROM comics c
-      JOIN comic_creators cc ON c.id = cc.comic_id
-      WHERE cc.creator_id = ?
-    `).all(id);
+    const { data: comicCreators, error: ccError } = await db
+      .from("comic_creators")
+      .select("comic_id")
+      .eq("creator_id", id);
+
+    if (ccError) throw ccError;
+
+    let comics: any[] = [];
+    const comicIds = comicCreators ? comicCreators.map((cc: any) => cc.comic_id) : [];
+    
+    if (comicIds.length > 0) {
+      const { data: fetchedComics, error: comicsError } = await db
+        .from("comics")
+        .select("id, title, cover_image, genre")
+        .in("id", comicIds);
+
+      if (comicsError) throw comicsError;
+      comics = fetchedComics || [];
+    }
 
     return NextResponse.json({ creator, comics });
   } catch (error: any) {
@@ -53,16 +72,33 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    const creatorExists = db.prepare("SELECT 1 FROM creators WHERE id = ?").get(id);
+    const { data: creatorExists, error: checkError } = await db
+      .from("creators")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
     if (!creatorExists) {
       return NextResponse.json({ error: "Creator not found" }, { status: 404 });
     }
 
-    db.prepare(`
-      UPDATE creators
-      SET name = ?, role = ?, bio = ?, followers = ?, reads = ?, twitter = ?, instagram = ?, artstation = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(name, role, bio, followers, reads, twitter, instagram, artstation, id);
+    const { error: updateError } = await db
+      .from("creators")
+      .update({
+        name,
+        role,
+        bio,
+        followers,
+        reads,
+        twitter,
+        instagram,
+        artstation,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -79,8 +115,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params;
 
   try {
-    const result = db.prepare("DELETE FROM creators WHERE id = ?").run(id);
-    if (result.changes === 0) {
+    const { data, error } = await db
+      .from("creators")
+      .delete()
+      .eq("id", id)
+      .select();
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
       return NextResponse.json({ error: "Creator not found" }, { status: 404 });
     }
     return NextResponse.json({ success: true });

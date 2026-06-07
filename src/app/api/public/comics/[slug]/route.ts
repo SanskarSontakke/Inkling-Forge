@@ -5,46 +5,69 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const { slug } = await params;
 
   try {
-    const comic = db.prepare("SELECT * FROM comics WHERE slug = ?").get(slug);
+    const { data: comic, error: comicError } = await db
+      .from("comics")
+      .select("*, comic_creators(creator_id)")
+      .eq("slug", slug)
+      .maybeSingle();
 
+    if (comicError) throw comicError;
     if (!comic) {
       return NextResponse.json({ error: "Comic not found" }, { status: 404 });
     }
 
     // Get creators
-    const creators = db.prepare(`
-      SELECT c.*
-      FROM creators c
-      JOIN comic_creators cc ON c.id = cc.creator_id
-      WHERE cc.comic_id = ?
-    `).all(comic.id);
+    let creators: any[] = [];
+    const creatorIds = comic.comic_creators ? comic.comic_creators.map((cc: any) => cc.creator_id) : [];
+    if (creatorIds.length > 0) {
+      const { data: fetchedCreators, error: creatorsError } = await db
+        .from("creators")
+        .select("*")
+        .in("id", creatorIds);
+      if (creatorsError) throw creatorsError;
+      creators = fetchedCreators || [];
+    }
 
     // Get episodes
-    const episodes = db.prepare(`
-      SELECT * FROM episodes
-      WHERE comic_id = ?
-      ORDER BY episode_number ASC
-    `).all(comic.id);
+    const { data: episodes, error: episodesError } = await db
+      .from("episodes")
+      .select("*")
+      .eq("comic_id", comic.id)
+      .order("episode_number", { ascending: true });
 
-    // For each episode, get panels
-    const chapters = episodes.map((ep: any) => {
-      const pages = db.prepare(`
-        SELECT image_path
-        FROM pages
-        WHERE episode_id = ?
-        ORDER BY page_number ASC
-      `).all(ep.id);
+    if (episodesError) throw episodesError;
 
-      return {
-        id: ep.id,
-        title: ep.title,
-        description: ep.description,
-        episode_number: ep.episode_number,
-        coverImage: ep.cover_image,
-        // Map page paths to panels array to keep layout identical to client expectations
-        panels: pages.map((p: any) => p.image_path)
-      };
-    });
+    // Get all pages for these episodes in a single optimized query
+    const episodeIds = episodes ? episodes.map((ep: any) => ep.id) : [];
+    const pagesByEpisode: Record<string, string[]> = {};
+    
+    if (episodeIds.length > 0) {
+      const { data: pages, error: pagesError } = await db
+        .from("pages")
+        .select("episode_id, image_path")
+        .in("episode_id", episodeIds)
+        .order("page_number", { ascending: true });
+
+      if (pagesError) throw pagesError;
+
+      // Group pages by episode_id
+      pages?.forEach((p: any) => {
+        if (!pagesByEpisode[p.episode_id]) {
+          pagesByEpisode[p.episode_id] = [];
+        }
+        pagesByEpisode[p.episode_id].push(p.image_path);
+      });
+    }
+
+    // For each episode, get panels from grouped pages map
+    const chapters = (episodes || []).map((ep: any) => ({
+      id: ep.id,
+      title: ep.title,
+      description: ep.description || "",
+      episode_number: ep.episode_number,
+      coverImage: ep.cover_image,
+      panels: pagesByEpisode[ep.id] || []
+    }));
 
     const formattedComic = {
       id: comic.id,
@@ -58,7 +81,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       coverImage: comic.cover_image,
       bannerImage: comic.banner_image,
       description: comic.description,
-      creatorIds: creators.map((c: any) => c.id),
+      creatorIds,
       chapters
     };
 

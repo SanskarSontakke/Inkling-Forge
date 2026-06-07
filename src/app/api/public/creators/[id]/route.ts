@@ -5,32 +5,49 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   try {
-    const creator = db.prepare("SELECT * FROM creators WHERE id = ?").get(id);
+    const { data: creator, error: creatorError } = await db
+      .from("creators")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
 
+    if (creatorError) throw creatorError;
     if (!creator) {
       return NextResponse.json({ error: "Creator not found" }, { status: 404 });
     }
 
-    const comics = db.prepare(`
-      SELECT c.*
-      FROM comics c
-      JOIN comic_creators cc ON c.id = cc.comic_id
-      WHERE cc.creator_id = ?
-    `).all(id);
+    const { data: comicCreators, error: ccError } = await db
+      .from("comic_creators")
+      .select("comic_id")
+      .eq("creator_id", id);
 
-    const formattedComics = comics.map((comic: any) => ({
-      id: comic.id,
-      title: comic.title,
-      slug: comic.slug,
-      genre: comic.genre,
-      reads: comic.reads,
-      score: comic.score,
-      rank: comic.rank,
-      isOriginal: !!comic.is_original,
-      coverImage: comic.cover_image,
-      bannerImage: comic.banner_image,
-      description: comic.description
-    }));
+    if (ccError) throw ccError;
+
+    let formattedComics: any[] = [];
+    const comicIds = comicCreators ? comicCreators.map((cc: any) => cc.comic_id) : [];
+    
+    if (comicIds.length > 0) {
+      const { data: comics, error: comicsError } = await db
+        .from("comics")
+        .select("*")
+        .in("id", comicIds);
+
+      if (comicsError) throw comicsError;
+
+      formattedComics = (comics || []).map((comic: any) => ({
+        id: comic.id,
+        title: comic.title,
+        slug: comic.slug,
+        genre: comic.genre,
+        reads: comic.reads,
+        score: comic.score,
+        rank: comic.rank,
+        isOriginal: !!comic.is_original,
+        coverImage: comic.cover_image,
+        bannerImage: comic.banner_image,
+        description: comic.description
+      }));
+    }
 
     const formattedCreator = {
       id: creator.id,

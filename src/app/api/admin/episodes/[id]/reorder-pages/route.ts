@@ -18,24 +18,40 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     // Verify episode exists
-    const episode = db.prepare("SELECT 1 FROM episodes WHERE id = ?").get(episodeId);
-    if (!episode) {
+    const { data: episodeExists, error: checkError } = await db
+      .from("episodes")
+      .select("id")
+      .eq("id", episodeId)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+    if (!episodeExists) {
       return NextResponse.json({ error: "Episode not found" }, { status: 404 });
     }
 
-    // Run updates in a transaction
-    const updateTransaction = db.transaction(() => {
-      const updateStmt = db.prepare("UPDATE pages SET page_number = ? WHERE id = ? AND episode_id = ?");
-      
-      pageIds.forEach((pageId, idx) => {
-        updateStmt.run(idx + 1, pageId, episodeId);
-      });
-
-      // Update episode timestamp
-      db.prepare("UPDATE episodes SET updated_at = datetime('now') WHERE id = ?").run(episodeId);
+    // Run updates concurrently
+    const updatePromises = pageIds.map((pageId: string, idx: number) => {
+      return db
+        .from("pages")
+        .update({ page_number: idx + 1 })
+        .eq("id", pageId)
+        .eq("episode_id", episodeId);
     });
 
-    updateTransaction();
+    const results = await Promise.all(updatePromises);
+    
+    // Check if any error occurred
+    for (const res of results) {
+      if (res.error) throw res.error;
+    }
+
+    // Update episode timestamp
+    const { error: tsError } = await db
+      .from("episodes")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", episodeId);
+
+    if (tsError) throw tsError;
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import db from "@/lib/db";
-import { v4 as uuidv4 } from "uuid";
 
 export async function GET(req: NextRequest) {
   const admin = getAdminUser(req);
@@ -10,19 +9,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const comics = db.prepare(`
-      SELECT c.*, GROUP_CONCAT(cc.creator_id) as creator_ids
-      FROM comics c
-      LEFT JOIN comic_creators cc ON c.id = cc.comic_id
-      GROUP BY c.id
-      ORDER BY c.created_at DESC
-    `).all();
+    const { data: comics, error } = await db
+      .from("comics")
+      .select("*, comic_creators(creator_id)")
+      .order("created_at", { ascending: false });
 
-    const formattedComics = comics.map((comic: any) => ({
+    if (error) throw error;
+
+    const formattedComics = (comics || []).map((comic: any) => ({
       ...comic,
       is_original: !!comic.is_original,
       is_trending: !!comic.is_trending,
-      creatorIds: comic.creator_ids ? comic.creator_ids.split(",") : []
+      creatorIds: comic.comic_creators ? comic.comic_creators.map((cc: any) => cc.creator_id) : []
     }));
 
     return NextResponse.json({ comics: formattedComics });
@@ -54,32 +52,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Title and slug are required" }, { status: 400 });
     }
 
-    const id = slug; // use slug as ID or generate UUID, let's use slug to match user expectations (url slug)
+    const id = slug; // use slug as ID to match existing DB layout
 
     // Check slug uniqueness
-    const exists = db.prepare("SELECT 1 FROM comics WHERE slug = ?").get(slug);
+    const { data: exists, error: checkError } = await db
+      .from("comics")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
     if (exists) {
       return NextResponse.json({ error: "A comic with this slug already exists" }, { status: 400 });
     }
 
-    // Run in a transaction
-    const insertTransaction = db.transaction(() => {
-      db.prepare(`
-        INSERT INTO comics (id, title, slug, description, genre, score, reads, rank, is_original)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, title, slug, description, genre, score, reads, rank, is_original ? 1 : 0);
-
-      const insertComicCreator = db.prepare(`
-        INSERT INTO comic_creators (comic_id, creator_id)
-        VALUES (?, ?)
-      `);
-
-      for (const creatorId of creatorIds) {
-        insertComicCreator.run(id, creatorId);
-      }
+    // Insert comic
+    const { error: insertError } = await db.from("comics").insert({
+      id,
+      title,
+      slug,
+      description,
+      genre,
+      score,
+      reads,
+      rank,
+      is_original
     });
 
-    insertTransaction();
+    if (insertError) throw insertError;
+
+    // Insert creators mapping
+    if (creatorIds.length > 0) {
+      const comicCreators = creatorIds.map((creatorId: string) => ({
+        comic_id: id,
+        creator_id: creatorId
+      }));
+
+      const { error: relationError } = await db.from("comic_creators").insert(comicCreators);
+      if (relationError) throw relationError;
+    }
 
     return NextResponse.json({ success: true, id });
   } catch (error: any) {

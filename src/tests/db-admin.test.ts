@@ -1,38 +1,48 @@
 import test from "node:test";
 import assert from "node:assert";
-import db from "../lib/db";
+import db, { seedSupabaseDatabase } from "../lib/db";
 import { compareCredentials, checkRateLimit, signToken, verifyToken } from "../lib/auth";
 
-test("Database Tables Existence Test", () => {
-  // Check that all tables exist in SQLite database
-  const tables = db.prepare(`
-    SELECT name FROM sqlite_master 
-    WHERE type='table' AND name IN ('comics', 'episodes', 'pages', 'creators', 'comic_creators')
-  `).all().map((row: any) => row.name);
+test("Database Tables Existence Test", async () => {
+  // Ensure the database is seeded for tests
+  await seedSupabaseDatabase();
 
-  assert.strictEqual(tables.includes("comics"), true, "comics table should exist");
-  assert.strictEqual(tables.includes("episodes"), true, "episodes table should exist");
-  assert.strictEqual(tables.includes("pages"), true, "pages table should exist");
-  assert.strictEqual(tables.includes("creators"), true, "creators table should exist");
-  assert.strictEqual(tables.includes("comic_creators"), true, "comic_creators table should exist");
+  // Query 1 row from each table to ensure they exist and are accessible in Supabase
+  const tables = ["comics", "episodes", "pages", "creators", "comic_creators"];
+  for (const table of tables) {
+    const { error } = await db.from(table).select("*").limit(1);
+    assert.strictEqual(error, null, `Table ${table} should exist and be queryable in Supabase`);
+  }
 });
 
-test("Seeded Data Integrity Test", () => {
+test("Seeded Data Integrity Test", async () => {
   // Verify creators row count
-  const creatorsCount = db.prepare("SELECT COUNT(*) as count FROM creators").get().count;
-  assert.ok(creatorsCount >= 5, "Should have seeded at least 5 creators");
+  const { count: creatorsCount, error: creatorsError } = await db
+    .from("creators")
+    .select("*", { count: "exact", head: true });
+  assert.strictEqual(creatorsError, null);
+  assert.ok((creatorsCount || 0) >= 5, "Should have seeded at least 5 creators");
 
   // Verify comics row count
-  const comicsCount = db.prepare("SELECT COUNT(*) as count FROM comics").get().count;
-  assert.ok(comicsCount >= 7, "Should have seeded at least 7 comics");
+  const { count: comicsCount, error: comicsError } = await db
+    .from("comics")
+    .select("*", { count: "exact", head: true });
+  assert.strictEqual(comicsError, null);
+  assert.ok((comicsCount || 0) >= 7, "Should have seeded at least 7 comics");
 
   // Verify episodes row count
-  const episodesCount = db.prepare("SELECT COUNT(*) as count FROM episodes").get().count;
-  assert.ok(episodesCount >= 9, "Should have seeded mock episodes");
+  const { count: episodesCount, error: episodesError } = await db
+    .from("episodes")
+    .select("*", { count: "exact", head: true });
+  assert.strictEqual(episodesError, null);
+  assert.ok((episodesCount || 0) >= 9, "Should have seeded mock episodes");
 
   // Verify pages row count
-  const pagesCount = db.prepare("SELECT COUNT(*) as count FROM pages").get().count;
-  assert.ok(pagesCount >= 9, "Should have seeded mock pages");
+  const { count: pagesCount, error: pagesError } = await db
+    .from("pages")
+    .select("*", { count: "exact", head: true });
+  assert.strictEqual(pagesError, null);
+  assert.ok((pagesCount || 0) >= 9, "Should have seeded mock pages");
 });
 
 test("Timing-Safe Credentials Comparison Test", () => {

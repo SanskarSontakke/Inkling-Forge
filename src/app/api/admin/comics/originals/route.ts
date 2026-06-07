@@ -15,18 +15,22 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "originalIds must be an array" }, { status: 400 });
     }
 
-    const updateTransaction = db.transaction(() => {
-      // 1. Reset all
-      db.prepare("UPDATE comics SET is_original = 0").run();
+    // 1. Reset all to false
+    const { error: resetError } = await db
+      .from("comics")
+      .update({ is_original: false });
 
-      // 2. Set selected
-      const setOriginal = db.prepare("UPDATE comics SET is_original = 1, updated_at = datetime('now') WHERE id = ?");
-      originalIds.forEach((id: string) => {
-        setOriginal.run(id);
-      });
-    });
+    if (resetError) throw resetError;
 
-    updateTransaction();
+    // 2. Set selected to true
+    if (originalIds.length > 0) {
+      const { error: setError } = await db
+        .from("comics")
+        .update({ is_original: true, updated_at: new Date().toISOString() })
+        .in("id", originalIds);
+
+      if (setError) throw setError;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

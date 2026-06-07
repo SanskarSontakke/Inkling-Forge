@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import db from "@/lib/db";
 import { parsePdfToWebp } from "@/lib/pdf-parser";
-import fs from "fs";
-import path from "path";
 
 // Set maximum body limit: 100MB
 export const maxDuration = 300; // Allow up to 5 minutes for processing large PDFs
@@ -36,45 +34,59 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Delete existing files in uploads/episodes/{episodeId}
-    const uploadsDir = path.join(process.cwd(), "public", "uploads", "episodes", episodeId);
-    if (fs.existsSync(uploadsDir)) {
-      fs.rmSync(uploadsDir, { recursive: true, force: true });
+    // Delete existing files in storage for this episode
+    try {
+      const { data: existingFiles } = await db.storage
+        .from("inklingforge")
+        .list(`episodes/${episodeId}`);
+
+      if (existingFiles && existingFiles.length > 0) {
+        const pathsToDelete = existingFiles.map(file => `episodes/${episodeId}/${file.name}`);
+        await db.storage.from("inklingforge").remove(pathsToDelete);
+      }
+    } catch (storageError) {
+      console.warn("Could not clean up existing storage files:", storageError);
     }
 
-    // Process PDF
+    // Process PDF and upload pages to Supabase Storage
     const parsedPages = await parsePdfToWebp(buffer, episodeId);
 
-    // Update Database
-    const updateDbTransaction = db.transaction(() => {
-      // 1. Delete existing database entries for pages
-      db.prepare("DELETE FROM pages WHERE episode_id = ?").run(episodeId);
+    // 1. Delete existing database entries for pages
+    const { error: deleteError } = await db
+      .from("pages")
+      .delete()
+      .eq("episode_id", episodeId);
 
-      // 2. Insert new pages
-      const insertPage = db.prepare(`
-        INSERT INTO pages (id, episode_id, page_number, original_page_number, image_path, width, height, file_size)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    if (deleteError) {
+      throw deleteError;
+    }
 
-      parsedPages.forEach(page => {
-        const pageId = `${episodeId}-p-${page.pageNumber}`;
-        insertPage.run(
-          pageId,
-          episodeId,
-          page.pageNumber,
-          page.pageNumber, // original_page_number
-          page.imagePath,
-          page.width,
-          page.height,
-          page.fileSize
-        );
-      });
+    // 2. Insert new pages in bulk
+    const pagesToInsert = parsedPages.map(page => ({
+      id: `${episodeId}-p-${page.pageNumber}`,
+      episode_id: episodeId,
+      page_number: page.pageNumber,
+      original_page_number: page.pageNumber, // original_page_number
+      image_path: page.imagePath,
+      width: page.width,
+      height: page.height,
+      file_size: page.fileSize
+    }));
 
-      // 3. Update episode updated_at timestamp
-      db.prepare("UPDATE episodes SET updated_at = datetime('now') WHERE id = ?").run(episodeId);
-    });
+    const { error: insertError } = await db.from("pages").insert(pagesToInsert);
+    if (insertError) {
+      throw insertError;
+    }
 
-    updateDbTransaction();
+    // 3. Update episode updated_at timestamp
+    const { error: epUpdateError } = await db
+      .from("episodes")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", episodeId);
+
+    if (epUpdateError) {
+      throw epUpdateError;
+    }
 
     return NextResponse.json({
       success: true,

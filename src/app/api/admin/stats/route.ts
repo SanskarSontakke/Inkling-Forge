@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
-import db from "@/lib/db";
+import db, { seedSupabaseDatabase } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const admin = getAdminUser(req);
@@ -9,38 +9,48 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const totalComics = db.prepare("SELECT COUNT(*) as count FROM comics").get().count;
-    const totalEpisodes = db.prepare("SELECT COUNT(*) as count FROM episodes").get().count;
-    const totalPages = db.prepare("SELECT COUNT(*) as count FROM pages").get().count;
-    const totalCreators = db.prepare("SELECT COUNT(*) as count FROM creators").get().count;
+    // Check if database needs seeding, and seed if empty
+    const { count: initialComicsCount, error: countError } = await db
+      .from("comics")
+      .select("*", { count: "exact", head: true });
 
-    // Get recent comics
-    const recentComics = db.prepare(`
-      SELECT id, title, updated_at, 'comic' as type 
-      FROM comics 
-      ORDER BY updated_at DESC 
-      LIMIT 3
-    `).all();
+    if (countError) throw countError;
 
-    // Get recent creators
-    const recentCreators = db.prepare(`
-      SELECT id, name as title, updated_at, 'creator' as type 
-      FROM creators 
-      ORDER BY updated_at DESC 
-      LIMIT 3
-    `).all();
+    if (initialComicsCount === 0) {
+      await seedSupabaseDatabase();
+    }
 
-    // Combine and sort
-    const recentActivity = [...recentComics, ...recentCreators]
-      .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    // Run parallel count and query calls to Supabase
+    const [
+      { count: totalComics },
+      { count: totalEpisodes },
+      { count: totalPages },
+      { count: totalCreators },
+      { data: recentComics },
+      { data: recentCreators }
+    ] = await Promise.all([
+      db.from("comics").select("*", { count: "exact", head: true }),
+      db.from("episodes").select("*", { count: "exact", head: true }),
+      db.from("pages").select("*", { count: "exact", head: true }),
+      db.from("creators").select("*", { count: "exact", head: true }),
+      db.from("comics").select("id, title, updated_at").order("updated_at", { ascending: false }).limit(3),
+      db.from("creators").select("id, name, updated_at").order("updated_at", { ascending: false }).limit(3)
+    ]);
+
+    // Format recent activity
+    const recentActivity = [
+      ...(recentComics || []).map(c => ({ id: c.id, title: c.title, updated_at: c.updated_at, type: "comic" })),
+      ...(recentCreators || []).map(cr => ({ id: cr.id, title: cr.name, updated_at: cr.updated_at, type: "creator" }))
+    ]
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 5);
 
     return NextResponse.json({
       stats: {
-        totalComics,
-        totalEpisodes,
-        totalPages,
-        totalCreators
+        totalComics: totalComics || 0,
+        totalEpisodes: totalEpisodes || 0,
+        totalPages: totalPages || 0,
+        totalCreators: totalCreators || 0
       },
       recentActivity
     });

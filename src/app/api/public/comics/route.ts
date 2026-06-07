@@ -7,34 +7,23 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("search");
 
   try {
-    let query = `
-      SELECT c.*, GROUP_CONCAT(cc.creator_id) as creator_ids
-      FROM comics c
-      LEFT JOIN comic_creators cc ON c.id = cc.comic_id
-    `;
-    const params: any[] = [];
+    // Select comics and their associated creator links
+    let query = db.from("comics").select("*, comic_creators(creator_id)");
 
-    const conditions: string[] = [];
     if (genre && genre !== "All" && genre !== "Originals") {
-      conditions.push("LOWER(c.genre) = LOWER(?)");
-      params.push(genre);
+      query = query.ilike("genre", genre);
     } else if (genre === "Originals") {
-      conditions.push("c.is_original = 1");
+      query = query.eq("is_original", true);
     }
 
     if (search) {
-      conditions.push("(LOWER(c.title) LIKE ? OR LOWER(c.description) LIKE ? OR LOWER(c.genre) LIKE ?)");
-      const term = `%${search.toLowerCase()}%`;
-      params.push(term, term, term);
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,genre.ilike.%${search}%`);
     }
 
-    if (conditions.length > 0) {
-      query += " WHERE " + conditions.join(" AND ");
-    }
+    query = query.order("created_at", { ascending: false });
 
-    query += " GROUP BY c.id ORDER BY c.created_at DESC";
-
-    const comics = db.prepare(query).all(...params);
+    const { data: comics, error } = await query;
+    if (error) throw error;
 
     const formattedComics = comics.map((comic: any) => ({
       id: comic.id,
@@ -48,7 +37,7 @@ export async function GET(req: NextRequest) {
       coverImage: comic.cover_image,
       bannerImage: comic.banner_image,
       description: comic.description,
-      creatorIds: comic.creator_ids ? comic.creator_ids.split(",") : []
+      creatorIds: comic.comic_creators ? comic.comic_creators.map((cc: any) => cc.creator_id) : []
     }));
 
     return NextResponse.json({ comics: formattedComics });

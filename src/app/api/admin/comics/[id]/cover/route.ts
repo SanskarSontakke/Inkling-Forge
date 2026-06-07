@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import db from "@/lib/db";
-import fs from "fs";
+import { uploadToStorage } from "@/lib/storage";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
@@ -25,24 +25,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "covers");
-    fs.mkdirSync(uploadDir, { recursive: true });
-
     const ext = path.extname(file.name) || ".webp";
     const filename = `${id}-${isBanner ? "banner" : "cover"}-${uuidv4()}${ext}`;
-    const filePath = path.join(uploadDir, filename);
+    const storagePath = `covers/${filename}`;
 
-    fs.writeFileSync(filePath, buffer);
-
-    const relativePath = `/uploads/covers/${filename}`;
+    const publicUrl = await uploadToStorage(buffer, storagePath, file.type || "image/webp");
 
     if (isBanner) {
-      db.prepare("UPDATE comics SET banner_image = ?, updated_at = datetime('now') WHERE id = ?").run(relativePath, id);
+      await db
+        .from("comics")
+        .update({ banner_image: publicUrl, updated_at: new Date().toISOString() })
+        .eq("id", id);
     } else {
-      db.prepare("UPDATE comics SET cover_image = ?, updated_at = datetime('now') WHERE id = ?").run(relativePath, id);
+      await db
+        .from("comics")
+        .update({ cover_image: publicUrl, updated_at: new Date().toISOString() })
+        .eq("id", id);
     }
 
-    return NextResponse.json({ success: true, path: relativePath });
+    return NextResponse.json({ success: true, path: publicUrl });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

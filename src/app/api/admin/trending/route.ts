@@ -9,13 +9,16 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const trendingComics = db.prepare(`
-      SELECT id, title, is_trending, trending_rank
-      FROM comics
-      ORDER BY is_trending DESC, trending_rank ASC, title ASC
-    `).all();
+    const { data: trendingComics, error } = await db
+      .from("comics")
+      .select("id, title, is_trending, trending_rank")
+      .order("is_trending", { ascending: false })
+      .order("trending_rank", { ascending: true })
+      .order("title", { ascending: true });
 
-    const formattedList = trendingComics.map((comic: any) => ({
+    if (error) throw error;
+
+    const formattedList = (trendingComics || []).map((comic: any) => ({
       id: comic.id,
       title: comic.title,
       is_trending: !!comic.is_trending,
@@ -35,29 +38,37 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const { trendingIds = [] } = await req.json(); // Array of comic IDs in trending order
+    const { trendingIds = [] } = await req.json();
 
     if (!Array.isArray(trendingIds)) {
       return NextResponse.json({ error: "trendingIds must be an array" }, { status: 400 });
     }
 
-    const updateTransaction = db.transaction(() => {
-      // 1. Reset all comics trending status
-      db.prepare("UPDATE comics SET is_trending = 0, trending_rank = 0").run();
+    // 1. Reset all comics trending status
+    const { error: resetError } = await db
+      .from("comics")
+      .update({ is_trending: false, trending_rank: 0 });
 
-      // 2. Set new trending rankings
-      const updateComicRank = db.prepare(`
-        UPDATE comics
-        SET is_trending = 1, trending_rank = ?, updated_at = datetime('now')
-        WHERE id = ?
-      `);
+    if (resetError) throw resetError;
 
-      trendingIds.forEach((id: string, index: number) => {
-        updateComicRank.run(index + 1, id);
+    // 2. Set new trending rankings
+    if (trendingIds.length > 0) {
+      const updatePromises = trendingIds.map((id: string, index: number) => {
+        return db
+          .from("comics")
+          .update({
+            is_trending: true,
+            trending_rank: index + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", id);
       });
-    });
 
-    updateTransaction();
+      const results = await Promise.all(updatePromises);
+      for (const res of results) {
+        if (res.error) throw res.error;
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

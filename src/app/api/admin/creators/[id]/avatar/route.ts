@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import db from "@/lib/db";
-import fs from "fs";
+import { uploadToStorage } from "@/lib/storage";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
@@ -24,20 +24,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "avatars");
-    fs.mkdirSync(uploadDir, { recursive: true });
-
     const ext = path.extname(file.name) || ".webp";
     const filename = `avatar-${id}-${uuidv4()}${ext}`;
-    const filePath = path.join(uploadDir, filename);
+    const storagePath = `avatars/${filename}`;
 
-    fs.writeFileSync(filePath, buffer);
+    const publicUrl = await uploadToStorage(buffer, storagePath, file.type || "image/webp");
 
-    const relativePath = `/uploads/avatars/${filename}`;
+    await db
+      .from("creators")
+      .update({ avatar: publicUrl, updated_at: new Date().toISOString() })
+      .eq("id", id);
 
-    db.prepare("UPDATE creators SET avatar = ?, updated_at = datetime('now') WHERE id = ?").run(relativePath, id);
-
-    return NextResponse.json({ success: true, path: relativePath });
+    return NextResponse.json({ success: true, path: publicUrl });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

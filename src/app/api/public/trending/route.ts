@@ -3,16 +3,15 @@ import db from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
-    const trendingComics = db.prepare(`
-      SELECT c.*, GROUP_CONCAT(cc.creator_id) as creator_ids
-      FROM comics c
-      LEFT JOIN comic_creators cc ON c.id = cc.comic_id
-      WHERE c.is_trending = 1
-      GROUP BY c.id
-      ORDER BY c.trending_rank ASC
-    `).all();
+    const { data: trendingComics, error } = await db
+      .from("comics")
+      .select("*, comic_creators(creator_id)")
+      .eq("is_trending", true)
+      .order("trending_rank", { ascending: true });
 
-    const formattedList = trendingComics.map((comic: any) => ({
+    if (error) throw error;
+
+    const formattedList = (trendingComics || []).map((comic: any) => ({
       id: comic.id,
       title: comic.title,
       slug: comic.slug,
@@ -24,7 +23,7 @@ export async function GET(req: NextRequest) {
       coverImage: comic.cover_image,
       bannerImage: comic.banner_image,
       description: comic.description,
-      creatorIds: comic.creator_ids ? comic.creator_ids.split(",") : []
+      creatorIds: comic.comic_creators ? comic.comic_creators.map((cc: any) => cc.creator_id) : []
     }));
 
     return NextResponse.json({ comics: formattedList });

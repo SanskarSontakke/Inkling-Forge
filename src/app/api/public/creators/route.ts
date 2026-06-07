@@ -3,7 +3,12 @@ import db from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
-    const creators = db.prepare("SELECT * FROM creators ORDER BY name ASC").all();
+    const { data: creators, error } = await db
+      .from("creators")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw error;
 
     const formattedCreators = creators.map((creator: any) => ({
       id: creator.id,

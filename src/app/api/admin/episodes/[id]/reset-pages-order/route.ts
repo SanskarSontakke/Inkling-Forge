@@ -12,18 +12,48 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     // Verify episode exists
-    const episode = db.prepare("SELECT 1 FROM episodes WHERE id = ?").get(episodeId);
-    if (!episode) {
+    const { data: episodeExists, error: checkError } = await db
+      .from("episodes")
+      .select("id")
+      .eq("id", episodeId)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+    if (!episodeExists) {
       return NextResponse.json({ error: "Episode not found" }, { status: 404 });
     }
 
-    // Run update in a transaction
-    const resetTransaction = db.transaction(() => {
-      db.prepare("UPDATE pages SET page_number = original_page_number WHERE episode_id = ?").run(episodeId);
-      db.prepare("UPDATE episodes SET updated_at = datetime('now') WHERE id = ?").run(episodeId);
+    // Fetch all pages for this episode to get their original page numbers
+    const { data: pages, error: fetchError } = await db
+      .from("pages")
+      .select("id, original_page_number")
+      .eq("episode_id", episodeId);
+
+    if (fetchError) throw fetchError;
+
+    // Reset page numbers concurrently
+    const resetPromises = (pages || []).map((page: any) => {
+      return db
+        .from("pages")
+        .update({ page_number: page.original_page_number })
+        .eq("id", page.id)
+        .eq("episode_id", episodeId);
     });
 
-    resetTransaction();
+    const results = await Promise.all(resetPromises);
+
+    // Check for any errors
+    for (const res of results) {
+      if (res.error) throw res.error;
+    }
+
+    // Update episode timestamp
+    const { error: tsError } = await db
+      .from("episodes")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", episodeId);
+
+    if (tsError) throw tsError;
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

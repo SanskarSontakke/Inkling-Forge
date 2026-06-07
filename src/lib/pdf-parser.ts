@@ -1,8 +1,10 @@
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import sharp from "sharp";
 import { v4 as uuidv4 } from "uuid";
+import { uploadToStorage } from "./storage";
 
 interface ParsedPage {
   pageNumber: number;
@@ -13,21 +15,17 @@ interface ParsedPage {
 }
 
 export async function parsePdfToWebp(pdfBuffer: Buffer, episodeId: string): Promise<ParsedPage[]> {
-  const tempDir = path.join(process.cwd(), "tmp", `pdf-${uuidv4()}`);
+  const tempDir = path.join(os.tmpdir(), `pdf-${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
 
   const tempPdfPath = path.join(tempDir, "source.pdf");
   fs.writeFileSync(tempPdfPath, pdfBuffer);
-
-  const uploadsDir = path.join(process.cwd(), "public", "uploads", "episodes", episodeId);
-  fs.mkdirSync(uploadsDir, { recursive: true });
 
   const parsedPages: ParsedPage[] = [];
 
   try {
     console.log(`Running pdftoppm on ${tempPdfPath}...`);
     // Extract pages as JPEGs at 150 DPI, pre-scaled to fit in a 2000px box.
-    // This is 50x faster, prevents out-of-memory errors, and yields excellent resolution.
     const pagePrefix = path.join(tempDir, "page");
     execSync(`pdftoppm -jpeg -scale-to 2000 -r 150 "${tempPdfPath}" "${pagePrefix}"`);
 
@@ -42,7 +40,7 @@ export async function parsePdfToWebp(pdfBuffer: Buffer, episodeId: string): Prom
       return { filename, pageNumber };
     }).sort((a, b) => a.pageNumber - b.pageNumber);
 
-    console.log(`Converting ${sortedJpgFiles.length} pages to WebP...`);
+    console.log(`Converting and uploading ${sortedJpgFiles.length} pages to Supabase Storage...`);
 
     // Process each image sequentially to avoid CPU spikes
     for (let i = 0; i < sortedJpgFiles.length; i++) {
@@ -50,9 +48,8 @@ export async function parsePdfToWebp(pdfBuffer: Buffer, episodeId: string): Prom
       const sourceJpgPath = path.join(tempDir, filename);
 
       const targetFilename = `page-${pageNumber}.webp`;
-      const targetPath = path.join(uploadsDir, targetFilename);
 
-      // Perform conversion and optimization using sharp (pre-scaled, so direct WebP conversion is fast)
+      // Perform conversion and optimization using sharp
       const imageProcessor = sharp(sourceJpgPath);
       const metadata = await imageProcessor.metadata();
       
@@ -63,21 +60,22 @@ export async function parsePdfToWebp(pdfBuffer: Buffer, episodeId: string): Prom
         .webp({ quality: 85, effort: 4 })
         .toBuffer();
 
-      // Write target WebP
-      fs.writeFileSync(targetPath, webpBuffer);
+      // Upload WebP buffer to storage
+      const storagePath = `episodes/${episodeId}/${targetFilename}`;
+      const publicUrl = await uploadToStorage(webpBuffer, storagePath, "image/webp");
 
       parsedPages.push({
         pageNumber,
-        imagePath: `/uploads/episodes/${episodeId}/${targetFilename}`,
+        imagePath: publicUrl,
         width,
         height,
         fileSize: webpBuffer.length
       });
     }
 
-    console.log(`Successfully processed ${parsedPages.length} pages.`);
+    console.log(`Successfully processed and uploaded ${parsedPages.length} pages.`);
   } catch (error) {
-    console.error("Error in PDF parsing pipeline:", error);
+    console.error("Error in PDF parsing/uploading pipeline:", error);
     throw error;
   } finally {
     // Clean up temporary directory

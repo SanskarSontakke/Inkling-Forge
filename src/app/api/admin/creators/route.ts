@@ -9,7 +9,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const creators = db.prepare("SELECT * FROM creators ORDER BY created_at DESC").all();
+    const { data: creators, error } = await db
+      .from("creators")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
     return NextResponse.json({ creators });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -40,19 +46,37 @@ export async function POST(req: NextRequest) {
 
     // Generate unique ID based on lowercase name with hyphens
     const baseId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    
+    // Fetch all existing creator IDs starting with this baseId in one query to prevent HTTP loop roundtrips
+    const { data: existingCreators, error: checkError } = await db
+      .from("creators")
+      .select("id")
+      .like("id", `${baseId}%`);
+
+    if (checkError) throw checkError;
+
+    const idSet = new Set((existingCreators || []).map(c => c.id));
     let id = baseId;
     let counter = 1;
     
-    // Check uniqueness and add counter if needed
-    while (db.prepare("SELECT 1 FROM creators WHERE id = ?").get(id)) {
+    while (idSet.has(id)) {
       id = `${baseId}-${counter}`;
       counter++;
     }
 
-    db.prepare(`
-      INSERT INTO creators (id, name, role, bio, followers, reads, twitter, instagram, artstation)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, name, role, bio, followers, reads, twitter, instagram, artstation);
+    const { error: insertError } = await db.from("creators").insert({
+      id,
+      name,
+      role,
+      bio,
+      followers,
+      reads,
+      twitter,
+      instagram,
+      artstation
+    });
+
+    if (insertError) throw insertError;
 
     return NextResponse.json({ success: true, id });
   } catch (error: any) {
