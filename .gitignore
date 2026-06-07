@@ -51,3 +51,6 @@ next-env.d.ts
 
 # User uploads (avatars, covers, WebPs)
 /public/uploads/
+
+# Local agent skills cache
+/.agents/
