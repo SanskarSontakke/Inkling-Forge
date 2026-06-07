@@ -1,0 +1,248 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #fff8f2;
+  --foreground: #211b0b;
+  --primary: #a83211;
+  --on-primary: #ffffff;
+  --secondary: #805600;
+  --on-secondary: #ffffff;
+  --secondary-container: #fdbe5b;
+  --on-secondary-container: #734d00;
+  --surface-low: #fff2dd;
+  --surface-highest: #efe1c7;
+  --card-bg: #faf5eb;
+  --header-bg: #efe1c7;
+  --outline-variant: #e0bfb7;
+  --border-color: #1A1A1A; /* Neubrutalist Day Ink Black */
+}
+
+.dark {
+  --background: #130d02;
+  --foreground: #efe1c7;
+  --primary: #ef6540;
+  --on-primary: #ffffff;
+  --secondary: #fabb59;
+  --on-secondary: #291800;
+  --secondary-container: #976600;
+  --on-secondary-container: #fff2e5;
+  --surface-low: #211b0b;
+  --surface-highest: #3c3422;
+  --card-bg: #261f0f;
+  --header-bg: #130d02;
+  --outline-variant: #59413b;
+  --border-color: #1B1C1A; /* Dark mode shadow/border black */
+}
+
+@theme {
+  /* Fonts */
+  --font-montserrat: var(--font-montserrat);
+  --font-work-sans: var(--font-work-sans);
+  --font-space-grotesk: var(--font-space-grotesk);
+
+  --font-headline: var(--font-montserrat), sans-serif;
+  --font-body: var(--font-work-sans), sans-serif;
+  --font-label: var(--font-space-grotesk), sans-serif;
+
+  /* Dynamic Brand Colors */
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card-bg: var(--card-bg);
+  --color-header-bg: var(--header-bg);
+  --color-border-color: var(--border-color);
+
+  --color-surface-low: var(--surface-low);
+  --color-surface-highest: var(--surface-highest);
+  --color-outline-variant: var(--outline-variant);
+
+  /* Neubrutalist Borders */
+  --border-width-3: 3px;
+  --border-width-4: 4px;
+
+  /* Custom Animations */
+  --animate-noise: noise-animation 0.2s infinite steps(1);
+  --animate-pulse-glow: pulse-glow 3s infinite ease-in-out;
+  --animate-shimmer: shimmer 1.5s infinite linear;
+}
+
+/* Custom Keyframe Definitions */
+@keyframes noise-animation {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-5%, -5%); }
+  20% { transform: translate(-10%, 5%); }
+  30% { transform: translate(5%, -10%); }
+  40% { transform: translate(-5%, 15%); }
+  50% { transform: translate(-10%, 5%); }
+  60% { transform: translate(15%, 0); }
+  70% { transform: translate(0, 10%); }
+  80% { transform: translate(-15%, 0); }
+  90% { transform: translate(10%, 5%); }
+  100% { transform: translate(5%, 0); }
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 4px 4px 0px 0px var(--border-color); }
+  50% { box-shadow: 4px 4px 15px 2px rgba(239, 101, 64, 0.4), 4px 4px 0px 0px var(--border-color); }
+  100% { box-shadow: 4px 4px 0px 0px var(--border-color); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Base resets & styles matching theme variables */
+body {
+  font-family: var(--font-work-sans), sans-serif;
+  overflow-x: hidden;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Neubrutalist UI Utilities */
+.brutal-shadow {
+  box-shadow: 4px 4px 0px 0px var(--border-color);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.brutal-shadow-hover:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px 0px var(--border-color);
+}
+
+.brutal-shadow-active:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px 0px var(--border-color);
+}
+
+/* Texture & Custom overlays (Subtle 0.015 opacity for a polished feel) */
+.grainy-overlay {
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  animation: noise-animation 0.2s infinite steps(1);
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #efeeea 25%, #e4e2de 50%, #efeeea 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(90deg, #3c3422 25%, #4e442d 50%, #3c3422 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* Scroll-driven Reveal transitions */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.scroll-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Custom Neubrutalist Scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+  border-left: 3px solid var(--border-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border: 3px solid var(--border-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .grainy-overlay {
+    animation: none !important;
+  }
+  .scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .pulse-glow {
+    animation: none !important;
+  }
+}
+
+/* Header auto-hide on scroll */
+header.header-hidden {
+  transform: translateY(-110%);
+}
+header {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Tab page slide transitions via View Transitions API */
+@media (prefers-reduced-motion: no-preference) {
+  /* Forward (right-to-left): going to a later tab */
+  @keyframes slide-out-left {
+    to { transform: translateX(-48px); opacity: 0; }
+  }
+  @keyframes slide-in-right {
+    from { transform: translateX(48px); opacity: 0; }
+  }
+  /* Backward (left-to-right): going to an earlier tab */
+  @keyframes slide-out-right {
+    to { transform: translateX(48px); opacity: 0; }
+  }
+  @keyframes slide-in-left {
+    from { transform: translateX(-48px); opacity: 0; }
+  }
+
+  /* Default: forward direction */
+  ::view-transition-old(page-content) {
+    animation: 200ms cubic-bezier(0.4, 0, 1, 1) both slide-out-left;
+  }
+  ::view-transition-new(page-content) {
+    animation: 280ms cubic-bezier(0, 0, 0.2, 1) both slide-in-right;
+  }
+
+  /* Backward direction when html has data-nav-dir=back */
+  :root[data-nav-dir="back"] ::view-transition-old(page-content) {
+    animation: 200ms cubic-bezier(0.4, 0, 1, 1) both slide-out-right;
+  }
+  :root[data-nav-dir="back"] ::view-transition-new(page-content) {
+    animation: 280ms cubic-bezier(0, 0, 0.2, 1) both slide-in-left;
+  }
+
+  /* Keep header and other persistent elements stationary */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+}
