@@ -32,7 +32,7 @@ function applyThemeClass(theme: Theme) {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
   const [grainEnabled, setGrainEnabledState] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentChapter, setCurrentChapter] = useState<string>("CHAPTER 42");
@@ -47,8 +47,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setThemeState(savedTheme);
       applyThemeClass(savedTheme);
     } else {
-      // Apply default dark theme class immediately
-      applyThemeClass("dark");
+      // Apply default light theme class immediately
+      applyThemeClass("light");
     }
 
     if (savedGrain !== null) {
