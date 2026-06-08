@@ -5,7 +5,7 @@ import { AppProvider } from "@/context/AppContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import GrainOverlay from "@/components/GrainOverlay";
-
+import { Analytics } from "@vercel/analytics/react";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -29,6 +29,9 @@ export const metadata: Metadata = {
   title: "Inkling Forge — The Underground Webcomic Platform",
   description:
     "Explore immersive, neubrutalist sequential art and indie comics. Dark mode immersion vertical reader, What's Hot trending charts, and creators directory.",
+  verification: {
+    google: "Yb3BIIOgMElzyIq-tP-RSQHFke8Dfc9v6lBQKyJiuR0",
+  },
 };
 
 export default function RootLayout({
@@ -43,14 +46,13 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <AppProvider>
-
           <GrainOverlay />
-          
           <Header />
           <main className="flex-grow w-full" style={{ viewTransitionName: "page-content" }}>
             {children}
           </main>
           <Footer />
+          <Analytics />
         </AppProvider>
       </body>
     </html>

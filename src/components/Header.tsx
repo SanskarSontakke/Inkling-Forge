@@ -140,7 +140,14 @@ export default function Header() {
         <div className="flex flex-col items-center w-full md:max-w-[80%] mx-auto px-4 py-3 gap-3">
           {/* Row 1: Logo & Actions */}
           <div className="flex items-center justify-between w-full">
-            <Link href="/" onClick={() => setSearchQuery("")}>
+            <Link href="/" onClick={() => setSearchQuery("")} className="flex items-center gap-3 group">
+              <div className="relative w-10 h-10 md:w-12 md:h-12 border-3 border-border-color bg-card-bg rounded-lg overflow-hidden brutal-shadow transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 flex items-center justify-center p-1 shrink-0">
+                <img
+                  src="/logo-icon.png"
+                  alt="Inkling Forge Icon"
+                  className="w-full h-full object-contain"
+                />
+              </div>
               <span className="font-headline text-3xl md:text-4xl uppercase tracking-tighter text-[#ef6540] dark:text-primary font-black cursor-pointer select-none">
                 INKLING_FORGE
               </span>
@@ -233,9 +240,18 @@ export default function Header() {
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between p-4 border-b-3 border-border-color">
-          <span className="font-headline text-2xl uppercase tracking-tighter text-[#ef6540] dark:text-primary font-black select-none">
-            INKLING_FORGE
-          </span>
+          <Link href="/" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2">
+            <div className="w-8 h-8 border-3 border-border-color bg-card-bg rounded-lg overflow-hidden brutal-shadow flex items-center justify-center p-0.5 shrink-0">
+              <img
+                src="/logo-icon.png"
+                alt="Inkling Forge Icon"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <span className="font-headline text-2xl uppercase tracking-tighter text-[#ef6540] dark:text-primary font-black select-none">
+              INKLING_FORGE
+            </span>
+          </Link>
           <button
             onClick={() => setDrawerOpen(false)}
             className="p-1.5 border-3 border-border-color bg-secondary text-white brutal-shadow cursor-pointer rounded-lg"

@@ -7,8 +7,15 @@ export default function Footer() {
   return (
     <footer className="w-full mt-auto border-t-3 border-border-color bg-card-bg text-foreground transition-colors duration-75">
       <div className="flex flex-col items-center justify-center w-full md:max-w-[80%] mx-auto py-12 px-4 text-center space-y-6">
-        <Link href="/">
-          <span className="font-headline text-3xl uppercase tracking-tighter font-black text-foreground cursor-pointer">
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="relative w-10 h-10 border-3 border-border-color bg-card-bg rounded-lg overflow-hidden brutal-shadow transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 flex items-center justify-center p-1 shrink-0">
+            <img
+              src="/logo-icon.png"
+              alt="Inkling Forge Icon"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="font-headline text-3xl uppercase tracking-tighter font-black text-foreground cursor-pointer select-none">
             INKLING_FORGE
           </span>
         </Link>

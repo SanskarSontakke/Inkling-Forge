@@ -39,13 +39,22 @@ export default function AdminSidebar() {
               <ArrowLeft size={12} /> BACK TO SITE
             </span>
           </Link>
-          <div className="bg-[#ef6540] border-3 border-[#1B1C1A] brutal-shadow p-3 rotate-1">
-            <h1 className="font-headline text-lg font-black text-white leading-none tracking-tight">
-              INKLING FORGE
-            </h1>
-            <p className="font-label text-[9px] text-white/80 font-bold uppercase tracking-widest mt-1">
-              ADMIN CONTROL
-            </p>
+          <div className="bg-[#ef6540] border-3 border-[#1B1C1A] brutal-shadow p-3 rotate-1 flex items-center gap-3">
+            <div className="w-10 h-10 bg-white border-2 border-[#1B1C1A] rounded flex items-center justify-center p-0.5 shrink-0">
+              <img
+                src="/logo-icon.png"
+                alt="Inkling Forge Icon"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="font-headline text-base font-black text-white leading-none tracking-tight">
+                INKLING FORGE
+              </h1>
+              <p className="font-label text-[8px] text-white/80 font-bold uppercase tracking-widest mt-0.5">
+                ADMIN CONTROL
+              </p>
+            </div>
           </div>
         </div>
 
