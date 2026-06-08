@@ -22,16 +22,20 @@ export const db = createClient(supabaseUrl, supabaseKey, {
 export async function seedSupabaseDatabase() {
   console.log("Checking if Supabase database needs seeding...");
   try {
-    const { count, error: countError } = await db
-      .from("comics")
-      .select("*", { count: "exact", head: true });
+    const [
+      { count: comicsCount, error: cErr },
+      { count: creatorsCount, error: crErr }
+    ] = await Promise.all([
+      db.from("comics").select("*", { count: "exact", head: true }),
+      db.from("creators").select("*", { count: "exact", head: true })
+    ]);
 
-    if (countError) {
-      console.error("Error checking comics count for seed:", countError);
+    if (cErr || crErr) {
+      console.error("Error checking database count for seed:", cErr || crErr);
       return;
     }
 
-    if (count && count > 0) {
+    if (comicsCount && comicsCount >= 7 && creatorsCount && creatorsCount >= 5) {
       console.log("Supabase database is already seeded.");
       return;
     }
