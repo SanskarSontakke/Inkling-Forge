@@ -2,6 +2,8 @@
 
 Inkling Forge is a premium, high-performance webcomics and sequential art publishing platform. Built with a bold **Neubrutalist Day/Night design system**, it features a fully dynamic SQLite database backend, a secured admin portal, a 50x optimized PDF extraction pipeline, and an interactive drag-and-drop page editor.
 
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/91172a4b-24ef-4396-8c24-60c7a588f9b7" />
+
 ---
 
 ## 🚀 Key Features
